@@ -1,5 +1,7 @@
 import numpy as np
 from PIL import Image
+from typing import Iterable
+from arg_parser import *
 
 symb_map = {
     "  ": range(0, 6),
@@ -81,7 +83,66 @@ symb_map_reversed = {
     "B ": range(0, 6),
 }
 
-def draw(size_x: int, size_y: int, symb_image: list[str]):
+def load_bw_pixels(filename: str) -> np.array or None:
+    pixels = None
+    with Image.open(filename, formats=("JPEG","PNG")).convert("L") as image:
+        pixels = np.asarray(image).astype(int)
+
+    return pixels
+
+
+def resize(src: np.array, x: int, y: int) -> np.array:
+    dst = np.zeros((y, x))
+    for y_ind in range(y):
+        for x_ind in range(x):
+            dst[y_ind, x_ind] = src[y_ind, x_ind]
+
+    return dst
+
+
+def img_to_symb_block(pixels: Iterable, symb_mapping: dict, block_size: int = 1) -> tuple[str]:
+    result_symb_image = list()
+    x = 0
+    y = 0
+    new_size_x = int(len(pixels[0]) / block_size) + 1
+    new_size_y = int(len(pixels) / block_size) + 1
+    res = np.zeros((new_size_y, new_size_x), dtype=int)
+
+    #print("len y of res:", len(res))
+    #print("len x of res:", len(res[0]))
+
+    for col in range(0, len(pixels), block_size):
+        x = 0
+        for row in range(0, len(pixels[0]), block_size):
+            avr = np.average(pixels[col:col+block_size, row:row+block_size])
+            res[y, x] = avr
+            x += 1
+        y += 1
+
+    #print(res)
+    #print()
+
+    if x != new_size_x or y != new_size_y:
+        res = resize(res, x, y)
+
+    #print("Counted x:", x)
+    #print("Counted y:", y)
+    return convert_to_symbls(symb_mapping, res)
+
+
+def convert_to_symbls(map_table: dict, pixels: np.array) -> tuple[str]:
+    result = list()
+    for row in pixels:
+        for pix in row:
+            for symb, rng in map_table.items():
+                if pix in rng:
+                    result.append(symb)
+                    break
+
+    return tuple(result)
+
+
+def draw(size_x: int, symb_image: list[str]):
     count = 0
     for symb in symb_image:
         if count >= size_x:
@@ -94,42 +155,42 @@ def draw(size_x: int, size_y: int, symb_image: list[str]):
     print()
 
 
-def main(filename: str):
-    pixels: np.array = None
-    symb_mapping: dict = symb_map
-    #symb_mapping: dict = symb_map_reversed
-
-    with Image.open(filename, formats=("JPEG","PNG")).convert("L") as image:
-        pixels = np.asarray(image).astype(int)
+def main(filename: str, block: int, symb_mapping: dict = symb_map):
+    pixels = load_bw_pixels(filename)
 
     if pixels is None:
         print("[ERROR] Image not loaded")
         return
 
-    size_x = len(pixels[0])
-    size_y = len(pixels)
+    size_x = int(len(pixels[0]) / block)
+    size_y = int(len(pixels) / block)
 
-    result_symb_image = list()
+    symb_image = img_to_symb_block(pixels, block_size=block, symb_mapping=symb_mapping)
 
-    for row in pixels:
-        for pix in row:
-            for symb, rng in symb_mapping.items():
-                if pix in rng:
-                    result_symb_image.append(symb)
-                    break
-
-    draw(size_x, size_y, result_symb_image)
+    draw(size_x, symb_image)
+    #print("block:", block)
+    #print("X:", size_x, "Y:", size_y)
+    #print("len img:", len(symb_image))
 
 
 if __name__ == "__main__":
-    import sys
-    try:
-        filename = sys.argv[1]
-    except IndexError:
-        print("Filename not given")
-        exit(1)
+    #import sys
+    #try:
+        #filename = sys.argv[1]
+    #except IndexError:
+        #print("Filename not given")
+        #exit(1)
 
-    main(filename)
+    args = parser.parse_args()
+    filename = args.filename
+    block_size = args.block_size
+    symbol_table = symb_map_reversed if args.reverse else symb_map
+
+    #print(filename)
+    #print(block_size)
+    #print("is reverse:", reverse)
+
+    main(filename, block_size, symb_mapping=symbol_table)
     #draw(x, y, img)
     #print("size:", x, y)
     #print(len(img))
