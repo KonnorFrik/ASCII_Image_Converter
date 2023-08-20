@@ -108,9 +108,6 @@ def img_to_symb_block(pixels: Iterable, symb_mapping: dict, block_size: int = 1)
     new_size_y = int(len(pixels) / block_size) + 1
     res = np.zeros((new_size_y, new_size_x), dtype=int)
 
-    #print("len y of res:", len(res))
-    #print("len x of res:", len(res[0]))
-
     for col in range(0, len(pixels), block_size):
         x = 0
         for row in range(0, len(pixels[0]), block_size):
@@ -119,14 +116,9 @@ def img_to_symb_block(pixels: Iterable, symb_mapping: dict, block_size: int = 1)
             x += 1
         y += 1
 
-    #print(res)
-    #print()
-
     if x != new_size_x or y != new_size_y:
         res = resize(res, x, y)
 
-    #print("Counted x:", x)
-    #print("Counted y:", y)
     return convert_to_symbls(symb_mapping, res)
 
 
@@ -155,7 +147,18 @@ def draw(size_x: int, symb_image: list[str]):
     print()
 
 
-def main(filename: str, block: int, symb_mapping: dict = symb_map):
+def save_image(size_x: int, symb_image: dict, out_file: str):
+    with open(out_file, "w") as file:
+        count = 0
+        for symb in symb_image:
+            if count >= size_x:
+                file.write("\n")
+                count = 0
+            file.write(symb)
+            count += 1
+
+
+def main(filename: str, block: int, out_file: str, symb_mapping: dict = symb_map):
     pixels = load_bw_pixels(filename)
 
     if pixels is None:
@@ -167,30 +170,23 @@ def main(filename: str, block: int, symb_mapping: dict = symb_map):
 
     symb_image = img_to_symb_block(pixels, block_size=block, symb_mapping=symb_mapping)
 
-    draw(size_x, symb_image)
-    #print("block:", block)
-    #print("X:", size_x, "Y:", size_y)
-    #print("len img:", len(symb_image))
+    if not out_file:
+        draw(size_x, symb_image)
+
+    else:
+        save_image(size_x, symb_image, out_file)
 
 
 if __name__ == "__main__":
-    #import sys
-    #try:
-        #filename = sys.argv[1]
-    #except IndexError:
-        #print("Filename not given")
-        #exit(1)
-
     args = parser.parse_args()
     filename = args.filename
     block_size = args.block_size
     symbol_table = symb_map_reversed if args.reverse else symb_map
+    output_file = args.output
 
-    #print(filename)
-    #print(block_size)
-    #print("is reverse:", reverse)
+    if block_size < 1:
+        print(f"Wrong block size: {block_size}.\nSee usage with '-h' or '--help' option")
+        exit(1)
 
-    main(filename, block_size, symb_mapping=symbol_table)
-    #draw(x, y, img)
-    #print("size:", x, y)
-    #print(len(img))
+    main(filename, block_size, symb_mapping=symbol_table, out_file=output_file)
+
